@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Score Tracker</title>
+    <style>
+        /* Cool UI Design */
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            width: 350px;
+        }
+        
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        #score {
+            font-size: 48px;
+            font-weight: bold;
+            color: #ffcc00;
+        }
+        
+        /* Bigger Increase Button */
+        #scoreButton {
+            padding: 18px 40px;
+            font-size: 22px;
+            background-color: #ffcc00;
+            color: black;
+            border: none;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: 0.3s;
+            font-weight: bold;
+        }
+        
+        #scoreButton:hover {
+            background-color: #ffdb4d;
+            transform: scale(1.1);
+        }
+
+        /* Other Buttons */
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #ffcc00;
+            color: black;
+            border: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: 0.3s;
+            font-weight: bold;
+            margin: 5px;
+        }
+        
+        button:hover {
+            background-color: #ffdb4d;
+            transform: scale(1.1);
+        }
+
+        input {
+            padding: 8px;
+            width: 80px;
+            text-align: center;
+            border-radius: 4px;
+            border: none;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Score: <span id="score">0</span></h1>
+        <button id="scoreButton">Increase Score</button>
+        <br><br>
+        <button id="resetButton">Reset Score</button>
+        
+        <br><br>
+        <input type="number" id="customNumber" placeholder="Enter number">
+        <button id="setScoreButton">Set Score</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const scoreElement = document.getElementById('score');
+            const scoreButton = document.getElementById('scoreButton');
+            const resetButton = document.getElementById('resetButton');
+            const customNumberInput = document.getElementById('customNumber');
+            const setScoreButton = document.getElementById('setScoreButton');
+
+            let score = parseInt(localStorage.getItem('score')) || 0;
+            scoreElement.textContent = score;
+
+            const lastUpdated = localStorage.getItem('lastUpdated');
+            const currentTime = new Date().getTime();
+            const twentyFourHours = 24 * 60 * 60 * 1000;
+
+            if (lastUpdated && (currentTime - lastUpdated > twentyFourHours)) {
+                localStorage.removeItem('score');
+                localStorage.setItem('lastUpdated', currentTime);
+                score = 0;
+                scoreElement.textContent = score;
+            }
+
+            scoreButton.addEventListener('click', function() {
+                score++;
+                scoreElement.textContent = score;
+                localStorage.setItem('score', score);
+                localStorage.setItem('lastUpdated', new Date().getTime());
+            });
+
+            resetButton.addEventListener('click', function() {
+                score = 0;
+                scoreElement.textContent = score;
+                localStorage.setItem('score', score);
+                localStorage.setItem('lastUpdated', new Date().getTime());
+            });
+
+            setScoreButton.addEventListener('click', function() {
+                let customValue = parseInt(customNumberInput.value);
+                if (!isNaN(customValue) && customValue >= 0) {
+                    score = customValue;
+                    scoreElement.textContent = score;
+                    localStorage.setItem('score', score);
+                    localStorage.setItem('lastUpdated', new Date().getTime());
+                } else {
+                    alert("Please enter a valid positive number.");
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
