@@ -3,104 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Card Detection Score Tracker</title>
+    <title>Person Detection with Bounding Boxes</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             font-family: Arial, sans-serif;
             text-align: center;
-            background-color: #f4f4f4;
-            padding: 20px;
+            background: black;
+            color: white;
+            overflow: hidden;
         }
-        h1 {
-            color: #333;
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
-        #video {
-            width: 80%;
-            max-width: 600px;
-            border: 2px solid #333;
-            border-radius: 10px;
+        .overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 18px;
         }
-        #score-container {
-            margin-top: 20px;
-            font-size: 24px;
-            font-weight: bold;
+        .btn-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
         }
-        button {
-            padding: 10px 20px;
+        .btn {
+            padding: 10px 15px;
             font-size: 16px;
             border: none;
-            background-color: #007BFF;
-            color: white;
-            border-radius: 5px;
             cursor: pointer;
-            margin: 10px;
+            border-radius: 5px;
         }
-        button:hover {
-            background-color: #0056b3;
+        .exit-btn {
+            background: red;
+            color: white;
+        }
+        .reset-btn {
+            background: orange;
+            color: white;
         }
     </style>
 </head>
 <body>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    
+    <div class="overlay">
+        Exit Count: <span id="exitCount">0</span>
+    </div>
 
-    <h1>Card Detection Score Tracker</h1>
-    
-    <video id="video" autoplay></video>
-    
-    <div id="score-container">Score: <span id="score">0</span></div>
-    
-    <button onclick="resetScore()">Reset Score</button>
+    <div class="btn-container">
+        <button class="btn exit-btn" onclick="stopCamera()">Exit</button>
+        <button class="btn reset-btn" onclick="resetCount()">Reset</button>
+    </div>
 
     <script>
-        let score = localStorage.getItem('score') ? parseInt(localStorage.getItem('score')) : 0;
-        document.getElementById('score').innerText = score;
-
         const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const exitCountElement = document.getElementById('exitCount');
+        
+        let exitCount = parseInt(localStorage.getItem('exitCount')) || 0;
+        let peopleInFrame = 0;
+        let model;
 
-        // Access the camera
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then((stream) => {
-                video.srcObject = stream;
-            })
-            .catch((err) => {
-                console.error("Camera access denied:", err);
-            });
+        exitCountElement.innerText = exitCount;
 
-        function detectCard() {
-            // **Basic Image Detection Simulation**
-            // In real implementation, you would use ML or an image recognition API
-            // Here, we'll simulate detection by checking brightness (not accurate)
-            
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+        async function setupCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { frameRate: 90 } });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            };
+        }
+
+        async function detectPersons() {
+            model = await cocoSsd.load();
+            requestAnimationFrame(detectLoop);
+        }
+
+        async function detectLoop() {
+            if (!model) return;
+            const predictions = await model.detect(video);
+            drawBoxes(predictions);
+
+            const personCount = predictions.filter(prediction => prediction.class === 'person').length;
+
+            if (peopleInFrame > personCount) {
+                exitCount++;
+                localStorage.setItem('exitCount', exitCount);
+                exitCountElement.innerText = exitCount;
+            }
+
+            peopleInFrame = personCount;
+            requestAnimationFrame(detectLoop); // Runs at the highest possible FPS
+        }
+
+        function drawBoxes(predictions) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            let brightness = 0;
+            predictions.forEach(prediction => {
+                if (prediction.class === 'person') {
+                    const [x, y, width, height] = prediction.bbox;
+                    ctx.strokeStyle = "lime";
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(x, y, width, height);
 
-            for (let i = 0; i < imageData.data.length; i += 4) {
-                brightness += (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
-            }
-
-            brightness /= (imageData.data.length / 4);
-
-            // **Simulated Detection: If brightness is high, assume card detected**
-            if (brightness > 100) { // Adjust threshold as needed
-                score++;
-                document.getElementById('score').innerText = score;
-                localStorage.setItem('score', score);
-            }
+                    ctx.fillStyle = "lime";
+                    ctx.font = "16px Arial";
+                    ctx.fillText("Person", x, y - 5);
+                }
+            });
         }
 
-        setInterval(detectCard, 3000); // Check every 3 seconds
-
-        function resetScore() {
-            score = 0;
-            localStorage.setItem('score', score);
-            document.getElementById('score').innerText = score;
+        function stopCamera() {
+            let stream = video.srcObject;
+            let tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            video.srcObject = null;
         }
+
+        function resetCount() {
+            exitCount = 0;
+            localStorage.setItem('exitCount', exitCount);
+            exitCountElement.innerText = exitCount;
+        }
+
+        async function init() {
+            await setupCamera();
+            detectPersons();
+        }
+
+        init();
     </script>
-
 </body>
 </html>
